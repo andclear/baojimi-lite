@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>baojimi-lite 控制台</title>
+    <style>
+        .logs-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .log-card {
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .log-card p { margin: 5px 0; }
+        .log-card .log-meta { font-size: 0.9em; color: #666; }
+        .log-card .log-error { color: #c00; font-size: 0.9em; }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 8px; text-align: center; }
+        .modal-content button { margin: 10px; }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .status-success {
+            color: green;
+        }
+        .status-failed {
+            color: red;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: auto; background-color: #f4f4f9; color: #333; }
+        .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #555; }
+        .status { padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .status.ok { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .status.error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #results { margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #fafafa; word-wrap: break-word; }
+        #copy-invalid { margin-top: 10px; display: none; }
+        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 20px; height: 20px; animation: spin 2s linear infinite; display: none; margin-left: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>baojimi-lite</h1>
+        <p>年轻人的第一个gemini代理轮询服务。</p>
+
+        <h2>服务状态</h2>
+        <div id="status-box" class="status">正在检测...</div>
+
+        <h2>API Key 检测</h2>
+        <p>配置的 API Key 数量: <strong id="key-count">0</strong></p>
+        <p>点击按钮，使用 `gemini-1.5-flash` 模型检测所有 Key 的有效性。</p>
+        <p><small>注意：如果设置了 `LAOPOBAO_AUTH` 密钥，需要在此输入。</small></p>
+        <input type="password" id="auth-key" placeholder="输入你的 LAOPOBAO_AUTH 密钥" style="padding: 8px; width: 300px; margin-bottom: 10px;">
+        <br>
+        <button id="check-keys-btn">开始检测</button>
+        <div id="loader" class="loader" style="display: inline-block; vertical-align: middle;"></div>
+      
+        <div id="results">
+            <p>检测结果将显示在这里。</p>
+        </div>
+        <button id="copy-invalid" style="display: none;">一键复制所有失效Key</button>
+
+
+        <h2>调用日志</h2>
+        <button id="refreshLogs">刷新日志</button>
+        <div id="logsContainer" class="logs-container">
+            <!-- Log cards will be inserted here -->
+        </div>
+      
+    </div>
+
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>错误详情</h2>
+            <pre id="modal-error-text" style="text-align: left; background: #eee; padding: 10px; border-radius: 5px; word-wrap: break-word; white-space: pre-wrap; max-height: 200px; overflow-y: auto;"></pre>
+            <button id="copy-error-btn">一键复制错误信息</button>
+            <button id="ask-ai-btn">复制错误并问AI</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
