@@ -1,37 +1,53 @@
 # GitHub Actions Docker 镜像打包指南
 
-本指南将详细介绍如何使用 GitHub Actions 自动构建和发布 Docker 镜像到 Docker Hub 和 GitHub Container Registry。
+本指南将详细介绍如何使用 GitHub Actions 自动构建和发布 Docker 镜像到 GitHub Container Registry (GHCR)。
+
+## 🎯 特色优势
+
+- ✅ **零配置**：无需创建外部账号或设置密钥
+- ✅ **Fork 友好**：其他用户 fork 后立即可用
+- ✅ **完全免费**：使用 GitHub 自带的容器注册表
+- ✅ **自动化**：推送代码即自动构建镜像
 
 ## 前置准备
 
-### 1. 创建 Docker Hub 账号
-- 访问 [Docker Hub](https://hub.docker.com/) 注册账号
-- 记录你的用户名，后续需要用到
+### 启用 GitHub Container Registry
+GitHub Container Registry 对所有用户免费开放，无需额外配置。只需确保：
 
-### 2. 生成 Docker Hub Access Token
-- 登录 Docker Hub
-- 进入 Account Settings > Security
-- 点击 "New Access Token"
-- 输入描述（如：GitHub Actions）
-- 选择权限：Read, Write, Delete
-- 复制生成的 token（只显示一次）
+1. 你的仓库是公开的，或者你有 GitHub Pro/Team/Enterprise 账号
+2. 仓库已启用 Actions（默认启用）
 
-### 3. 配置 GitHub Secrets
-在你的 GitHub 仓库中设置以下 Secrets：
+## 🚀 使用方法
 
-1. 进入仓库 Settings > Secrets and variables > Actions
-2. 点击 "New repository secret" 添加以下密钥：
+### 1. 自动构建（推荐）
+项目已包含 GitHub Actions 工作流文件，无需任何配置：
 
-| Secret 名称 | 值 | 说明 |
-|------------|----|----|
-| `DOCKER_HUB_USERNAME` | 你的 Docker Hub 用户名 | 用于登录 Docker Hub |
-| `DOCKER_HUB_ACCESS_TOKEN` | 刚才生成的 Access Token | 用于认证 |
+- **推送到 main 分支**：自动构建 `latest` 标签
+- **创建 release 标签**：自动构建版本标签
+- **Pull Request**：构建测试（不推送）
 
-## 创建 GitHub Actions 工作流
+### 2. 手动触发
+在 GitHub 仓库页面：
+1. 点击 "Actions" 标签
+2. 选择 "Build and Push Docker Image" 工作流
+3. 点击 "Run workflow" 按钮
 
-### 1. 创建工作流文件
-在你的仓库根目录创建 `.github/workflows/docker-build.yml` 文件：
+### 3. 工作流说明
 
+#### 触发条件
+- `push` 到 `main` 分支
+- 创建以 `v` 开头的标签（如 `v1.0.0`）
+- 对 `main` 分支的 Pull Request
+- 手动触发
+
+#### 构建目标
+- **GitHub Container Registry**: `ghcr.io/你的用户名/仓库名`
+
+#### 支持平台
+- `linux/amd64` (x86_64)
+- `linux/arm64` (ARM64)
+
+#### 工作流文件内容
 ```yaml
 name: Build and Push Docker Image
 
@@ -41,11 +57,11 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
-  REGISTRY_DOCKERHUB: docker.io
-  REGISTRY_GHCR: ghcr.io
-  IMAGE_NAME: baojimi-lite
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -61,19 +77,11 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Docker Hub
+    - name: Log in to Container Registry
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
-        registry: ${{ env.REGISTRY_DOCKERHUB }}
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-    - name: Log in to GitHub Container Registry
-      if: github.event_name != 'pull_request'
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY_GHCR }}
+        registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -81,9 +89,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: |
-          ${{ env.REGISTRY_DOCKERHUB }}/${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
-          ${{ env.REGISTRY_GHCR }}/${{ github.repository }}
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -103,55 +109,29 @@ jobs:
         cache-to: type=gha,mode=max
 ```
 
-### 2. 工作流说明
+## 📦 版本管理
 
-#### 触发条件
-- `push` 到 `main` 分支
-- 创建以 `v` 开头的标签（如 `v1.0.0`）
-- 对 `main` 分支的 Pull Request
-
-#### 构建目标
-- **Docker Hub**: `docker.io/你的用户名/baojimi-lite`
-- **GitHub Container Registry**: `ghcr.io/你的用户名/仓库名`
-
-#### 支持平台
-- `linux/amd64` (x86_64)
-- `linux/arm64` (ARM64)
-
-## 使用方法
-
-### 1. 自动构建
-- 推送代码到 `main` 分支会自动触发构建
-- 创建 release 标签会构建对应版本的镜像
-
-### 2. 手动触发
-- 在 GitHub 仓库的 Actions 页面
-- 选择 "Build and Push Docker Image" 工作流
-- 点击 "Run workflow"
-
-### 3. 版本管理
 推荐使用语义化版本标签：
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-这会创建以下镜像标签：
-- `latest`
-- `v1.0.0`
-- `v1.0`
-- `v1`
+这会自动创建以下镜像标签：
+- `latest` (main 分支)
+- `v1.0.0` (完整版本)
+- `v1.0` (次版本)
+- `v1` (主版本)
 
-## 镜像使用
+## 🐳 镜像使用
 
-### 从 Docker Hub 拉取
+### 拉取镜像
 ```bash
-docker pull 你的用户名/baojimi-lite:latest
-```
-
-### 从 GitHub Container Registry 拉取
-```bash
+# 拉取最新版本
 docker pull ghcr.io/你的用户名/仓库名:latest
+
+# 拉取指定版本
+docker pull ghcr.io/你的用户名/仓库名:v1.0.0
 ```
 
 ### 运行容器
@@ -162,7 +142,7 @@ docker run -d \
   -e GEMINI_API_KEYS="your_api_key1,your_api_key2" \
   -e LAOPOBAO_AUTH="your_auth_key" \
   -e MAX_TRY=3 \
-  你的用户名/baojimi-lite:latest
+  ghcr.io/你的用户名/仓库名:latest
 ```
 
 ## 环境变量说明
@@ -217,14 +197,25 @@ docker run -d \
     output: 'trivy-results.sarif'
 ```
 
-## Fork 用户指南
+## 🍴 Fork 用户指南
 
-如果你 fork 了这个项目，只需要：
+如果你 fork 了这个项目，**无需任何配置**即可使用：
 
-1. 在你的仓库中设置 `DOCKER_HUB_USERNAME` 和 `DOCKER_HUB_ACCESS_TOKEN` secrets
+### 立即可用
+1. Fork 这个仓库到你的 GitHub 账号
 2. 推送代码到 main 分支或创建 release 标签
-3. GitHub Actions 会自动构建并推送镜像到你的 Docker Hub 账号
+3. GitHub Actions 会自动构建并推送镜像
 
-镜像将发布到：
-- `docker.io/你的用户名/baojimi-lite`
-- `ghcr.io/你的用户名/你的仓库名`
+### 镜像地址
+你的镜像将自动发布到：
+- `ghcr.io/你的用户名/你的仓库名:latest`
+- `ghcr.io/你的用户名/你的仓库名:v1.0.0` (如果创建了标签)
+
+### 使用示例
+```bash
+# 如果你的 GitHub 用户名是 john，仓库名是 baojimi-lite
+docker pull ghcr.io/john/baojimi-lite:latest
+docker run -d -p 7860:7860 \
+  -e GEMINI_API_KEYS="your_keys" \
+  ghcr.io/john/baojimi-lite:latest
+```
