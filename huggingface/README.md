@@ -1,5 +1,5 @@
 ---
-title: 报吉米 Lite
+title: Baojimi Lite
 emoji: 🤖
 colorFrom: blue
 colorTo: green
@@ -50,22 +50,16 @@ license: mit
    - **SDK**: Docker
    - **Hardware**: CPU basic (免费) 或根据需要选择
 
-### 2. 上传代码
+### 2. 上传文件
 
-将以下文件上传到你的 Space：
+只需要将以下 2 个文件上传到你的 Space：
 
 ```
 ├── Dockerfile              # 使用 huggingface/Dockerfile
-├── README.md               # 使用 huggingface/README.md
-├── requirements.txt        # 从根目录复制
-├── app/                    # 从根目录复制整个 app 文件夹
-│   ├── __init__.py
-│   └── main.py
-└── public/                 # 从根目录复制整个 public 文件夹
-    ├── index.html
-    ├── script.js
-    └── style.css
+└── README.md               # 使用 huggingface/README.md
 ```
+
+**注意**：Dockerfile 会自动拉取预构建的镜像 `ghcr.io/andclear/baojimi-lite:latest`，无需上传其他代码文件。
 
 ### 3. 配置环境变量
 
@@ -173,6 +167,30 @@ license: mit
 ## 许可证
 
 MIT License - 详见 LICENSE 文件
+
+## 🍴 Fork 用户部署指南
+
+如果你 fork 了这个项目并想部署到 Hugging Face Spaces：
+
+### 1. 修改 Dockerfile
+将 `huggingface/Dockerfile` 中的镜像地址改为你的：
+
+```dockerfile
+# 将这行
+FROM ghcr.io/andclear/baojimi-lite:latest
+
+# 改为你的镜像地址
+FROM ghcr.io/你的用户名/你的仓库名:latest
+```
+
+### 2. 确保镜像已构建
+- 推送代码到你的 GitHub 仓库
+- 等待 GitHub Actions 自动构建镜像
+- 在 GitHub 仓库的 Packages 页面确认镜像已发布
+
+### 3. 部署到 Hugging Face
+- 按照上述部署步骤操作
+- 使用修改后的 Dockerfile 和 README.md
 
 ## 支持
 
