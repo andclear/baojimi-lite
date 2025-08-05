@@ -1,14 +1,12 @@
 ---
-title: baojimi-lite
+title: Baojimi Lite
 emoji: 🚀
 colorFrom: blue
 colorTo: green
-sdk: docker
 app_port: 7860
-secrets:
-  - GEMINI_API_KEYS
-  - LAOPOBAO_AUTH
-  - MAX_TRY
+sdk: docker
+pinned: false
+license: mit
 ---
 
 # baojimi-lite
@@ -27,5 +25,5 @@ secrets:
 
 ## ⚠️ 使用条款
 - **本项目为个人学习和实验用途，严禁用于任何商业或非法活动。**
-- **这是一个私有项目，请勿公开分享访问地址和密钥。**
+- **这是一个由老婆宝创建的酒馆交流群中的私有项目，请勿公开分享。**
 - **所有通过本服务发起的 API 请求，其内容和后果由调用者自行承担。**

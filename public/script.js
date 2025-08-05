@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('获取日志时出错:', error);
             const logsContainer = document.getElementById('logsContainer');
             if (logsContainer) {
-                logsContainer.innerHTML = `<p style="color: red;">加载日志失败: ${error.message}</p>`;
+                logsContainer.innerHTML = `<p style="color: red;">加载日志失败: ${error.message}，请检查授权码或网络连接。</p>`;
             }
         });
     }

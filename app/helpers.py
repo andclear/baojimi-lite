@@ -54,8 +54,11 @@ def openai_to_gemini_params(openai_request: dict) -> dict:
     generation_config = {
         "temperature": openai_request.get("temperature"),
         "top_p": openai_request.get("top_p"),
-        "max_output_tokens": openai_request.get("max_tokens"),
     }
+
+    if "max_tokens" in openai_request and openai_request["max_tokens"] is not None:
+        generation_config["max_output_tokens"] = openai_request["max_tokens"]
+
     gemini_params["generation_config"] = {k: v for k, v in generation_config.items() if v is not None}
 
     messages = openai_request.get("messages", [])

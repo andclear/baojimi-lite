@@ -17,12 +17,14 @@ from slowapi.errors import RateLimitExceeded
 from .helpers import get_safety_settings, openai_to_gemini_params
 from .models import ChatCompletionRequest
 from collections import deque
+from . import gem_handler
 
 # --- 日志记录 ---
 MAX_LOG_ENTRIES = 20
 call_logs = deque(maxlen=MAX_LOG_ENTRIES)
 
 # --- 配置 ---
+GEM_ENABLED = os.environ.get("GEM", "false").lower() == "true"
 GEMINI_API_KEYS = [key.strip() for key in os.environ.get("GEMINI_API_KEYS", "").split(',') if key.strip()]
 LAOPOBAO_AUTH_KEY = os.environ.get("LAOPOBAO_AUTH")
 MAX_TRY = int(os.environ.get("MAX_TRY", 3))
@@ -144,12 +146,18 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
             )
           
             if req.stream:
-                response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], stream=True)
+                if GEM_ENABLED and model_name.startswith('gemini'):
+                    # Use the self-healing stream generator for all gemini models
+                    response_generator = gem_handler.self_healing_stream_generator(model_name, gemini_params, api_key)
+                else:
+                    # Use the standard stream generator
+                    response_generator = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], stream=True)
+                
                 log_entry["status"] = "success"
                 call_logs.appendleft(log_entry)
-                return StreamingResponse(stream_generator(response, model_name), media_type="text/event-stream")
+                return StreamingResponse(stream_generator(response_generator, model_name), media_type="text/event-stream")
             else:
-                response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"])
+                response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], system_instruction=gemini_params.get("system_instruction"))
                 log_entry["status"] = "success"
                 call_logs.appendleft(log_entry)
                 return non_stream_response(response, model_name)
@@ -169,6 +177,19 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
     raise HTTPException(status_code=500, detail="Failed to get response from Gemini after all retries.")
 
 # --- 辅助函数 ---
+def gemini_finish_reason_to_openai(reason: str) -> str:
+    """Converts Gemini's finish reason to OpenAI's format."""
+    if reason is None:
+        return "stop"
+    # Maps Gemini finish reasons to OpenAI equivalents.
+    return {
+        "STOP": "stop",
+        "MAX_TOKENS": "length",
+        "SAFETY": "content_filter",
+        "RECITATION": "content_filter",
+        "OTHER": "stop",
+    }.get(reason, "stop")
+
 async def stream_generator(gemini_response, model_name):
     try:
         async for chunk in gemini_response:
@@ -183,7 +204,7 @@ async def stream_generator(gemini_response, model_name):
                     {
                         "index": 0,
                         "delta": {"content": chunk.text},
-                        "finish_reason": None
+                        "finish_reason": gemini_finish_reason_to_openai(chunk.candidates[0].finish_reason) if chunk.candidates else None
                     }
                 ]
             }
@@ -213,6 +234,8 @@ def non_stream_response(gemini_response, model_name):
     try:
         content = gemini_response.text
         usage = gemini_response.usage_metadata
+        finish_reason = gemini_finish_reason_to_openai(gemini_response.candidates[0].finish_reason if gemini_response.candidates else None)
+
         return {
             "id": f"chatcmpl-{uuid.uuid4()}",
             "object": "chat.completion",
@@ -222,7 +245,7 @@ def non_stream_response(gemini_response, model_name):
                 {
                     "index": 0,
                     "message": {"role": "assistant", "content": content},
-                    "finish_reason": "stop"
+                    "finish_reason": finish_reason
                 }
             ],
             "usage": {
@@ -243,6 +266,8 @@ def non_stream_response(gemini_response, model_name):
             status_code=500,
             content={"error": "Failed to process Gemini response", "details": error_details}
         )
+
+
 
 # --- 注册路由和静态文件服务 ---
 app.include_router(v1_router)
