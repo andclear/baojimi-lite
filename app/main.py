@@ -4,6 +4,7 @@ import time
 import uuid
 import httpx
 import random
+import logging
 from fastapi import FastAPI, Request, HTTPException, Depends, APIRouter
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import APIKeyHeader
@@ -42,30 +43,31 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # --- 启动事件 ---
 @app.on_event("startup")
 async def startup_event():
-    print("--- Baojimi-lite Configuration Check ---")
+    logger = logging.getLogger("uvicorn.info")
+    logger.info("--- Baojimi-lite Configuration Check ---")
     if GEMINI_API_KEYS:
-        print("已配置Gemini API Key")
+        logger.info("已配置Gemini API Key")
     else:
-        print("未配置Gemini API Key")
+        logger.warning("未配置Gemini API Key")
 
     if LAOPOBAO_AUTH_KEY:
-        print("已配置调用密钥")
+        logger.info("已配置调用密钥")
     else:
-        print("未配置调用密钥，请立即配置")
+        logger.warning("未配置调用密钥，请立即配置")
 
     if 'MAX_TRY' in os.environ:
-        print(f"已配置最大重试次数，最大重试次数为{MAX_TRY}")
+        logger.info(f"已配置最大重试次数，最大重试次数为{MAX_TRY}")
     else:
-        print(f"未配置最大重试次数，默认为 3")
+        logger.info(f"未配置最大重试次数，默认为 3")
 
     if 'GEM' in os.environ:
         if GEM_ENABLED:
-            print("已开启GEM自愈功能")
+            logger.info("已开启GEM自愈功能")
         else:
-            print("已加载GEM自愈功能，但尚未启动，如需启动，请将GEM的值更改为true")
+            logger.info("已加载GEM自愈功能，但尚未启动，如需启动，请将GEM的值更改为true")
     else:
-        print("GEM自愈系统未启动，将按照常规方式处理API调用")
-    print("----------------------------------------")
+        logger.warning("GEM自愈系统未启动，将按照常规方式处理API调用")
+    logger.info("----------------------------------------")
 
 # --- 路由 ---
 v1_router = APIRouter(prefix="/v1")
