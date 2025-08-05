@@ -178,7 +178,7 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
             if req.stream:
                 if GEM_ENABLED and model_name.startswith('gemini'):
                     # Use the self-healing stream generator for all gemini models
-                    response_generator = gem_handler.self_healing_stream_generator(model_name, gemini_params, api_key)
+                    response_generator = gem_handler.self_healing_stream_generator(model_name, gemini_params, api_key, safety_settings)
                 else:
                     # Use the standard stream generator
                     response_generator = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], stream=True)
