@@ -18,7 +18,7 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key, safe
         try:
             # Configure the API key for each attempt
             genai.configure(api_key=api_key)
-            current_safety_settings = safety_settings_g2 if model_name.startswith('gemini-2') else safety_settings
+            current_safety_settings = safety_settings_g2 if 'gemini-2.5' in model_name else safety_settings
             model = genai.GenerativeModel(model_name, safety_settings=current_safety_settings)
 
             # Combine history with the initial request for retries

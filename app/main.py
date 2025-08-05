@@ -148,7 +148,7 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
     model_name = req.model
     try:
         gemini_params = openai_to_gemini_params(req.dict())
-        safety_settings = SAFETY_SETTINGS_G2 if model_name.startswith('gemini-2') else SAFETY_SETTINGS
+        safety_settings = SAFETY_SETTINGS_G2 if 'gemini-2.5' in model_name else SAFETY_SETTINGS
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
