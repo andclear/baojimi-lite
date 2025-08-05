@@ -39,6 +39,34 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# --- 启动事件 ---
+@app.on_event("startup")
+async def startup_event():
+    print("--- Baojimi-lite Configuration Check ---")
+    if GEMINI_API_KEYS:
+        print("已配置Gemini API Key")
+    else:
+        print("未配置Gemini API Key")
+
+    if LAOPOBAO_AUTH_KEY:
+        print("已配置调用密钥")
+    else:
+        print("未配置调用密钥，请立即配置")
+
+    if 'MAX_TRY' in os.environ:
+        print(f"已配置最大重试次数，最大重试次数为{MAX_TRY}")
+    else:
+        print(f"未配置最大重试次数，默认为 3")
+
+    if 'GEM' in os.environ:
+        if GEM_ENABLED:
+            print("已开启GEM自愈功能")
+        else:
+            print("已加载GEM自愈功能，但尚未启动，如需启动，请将GEM的值更改为true")
+    else:
+        print("GEM自愈系统未启动，将按照常规方式处理API调用")
+    print("----------------------------------------")
+
 # --- 路由 ---
 v1_router = APIRouter(prefix="/v1")
 admin_router = APIRouter(prefix="/api")
