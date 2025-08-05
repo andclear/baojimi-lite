@@ -2,7 +2,7 @@ import google.generativeai as genai
 
 MAX_RETRIES = 2
 
-async def self_healing_stream_generator(model_name, gemini_params, api_key, safety_settings):
+async def self_healing_stream_generator(model_name, gemini_params, api_key, safety_settings, safety_settings_g2):
     """
     A generator that attempts to stream a response from the Gemini API, with self-healing capabilities.
     If the stream is interrupted, it retries the request with the conversation history.
@@ -18,7 +18,8 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key, safe
         try:
             # Configure the API key for each attempt
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(model_name, safety_settings=safety_settings)
+            current_safety_settings = safety_settings_g2 if model_name.startswith('gemini-2') else safety_settings
+            model = genai.GenerativeModel(model_name, safety_settings=current_safety_settings)
 
             # Combine history with the initial request for retries
             current_contents = initial_contents + chat_history

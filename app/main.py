@@ -15,7 +15,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from .helpers import get_safety_settings, openai_to_gemini_params
+from .helpers import SAFETY_SETTINGS, SAFETY_SETTINGS_G2, openai_to_gemini_params
 from .models import ChatCompletionRequest
 from collections import deque
 from . import gem_handler
@@ -148,7 +148,7 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
     model_name = req.model
     try:
         gemini_params = openai_to_gemini_params(req.dict())
-        safety_settings = get_safety_settings(model_name)
+        safety_settings = SAFETY_SETTINGS_G2 if model_name.startswith('gemini-2') else SAFETY_SETTINGS
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -178,7 +178,7 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
             if req.stream:
                 if GEM_ENABLED and model_name.startswith('gemini'):
                     # Use the self-healing stream generator for all gemini models
-                    response_generator = gem_handler.self_healing_stream_generator(model_name, gemini_params, api_key, safety_settings)
+                    response_generator = gem_handler.self_healing_stream_generator(model_name, gemini_params, api_key, SAFETY_SETTINGS, SAFETY_SETTINGS_G2)
                 else:
                     # Use the standard stream generator
                     response_generator = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], stream=True)

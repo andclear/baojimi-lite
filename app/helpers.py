@@ -50,10 +50,6 @@ SAFETY_SETTINGS_G2 = [
     }
 ]
 
-def get_safety_settings(model_name: str) -> List[Dict[str, str]]:
-    if model_name.startswith('gemini-2'):
-        return SAFETY_SETTINGS_G2
-    return SAFETY_SETTINGS
 
 def openai_to_gemini_params(openai_request: dict) -> dict:
     """Converts OpenAI-compatible request parameters to Gemini format."""
