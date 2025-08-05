@@ -43,12 +43,13 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
             chunk_count = 0
             async for chunk in response:
                 yield chunk
-                if chunk.text:
+                # Ensure the chunk has content before trying to access .text
+                if chunk.parts:
                     full_response_text += chunk.text
                 chunk_count += 1
             
             # If we received chunks, the stream is considered successful for this attempt
-            if chunk_count > 0:
+            if chunk_count > 0 and (not response.prompt_feedback or response.prompt_feedback.block_reason != 'SAFETY'):
                 logger.info("Stream completed successfully.")
                 return
 
@@ -57,10 +58,9 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
             # Add the successfully received part of the response to history before retrying
             if full_response_text:
                 chat_history.append({"role": "model", "parts": [full_response_text]})
+                # Add a user message to guide the model to continue
+                chat_history.append({"role": "user", "parts": ["Please continue generating the response from where you left off."]})
                 full_response_text = "" # Reset for the next retry
-
-            # After the first attempt, subsequent retries should not include the initial user prompt again
-            initial_contents = []
 
             retries += 1
             if retries > MAX_RETRIES:
