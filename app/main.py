@@ -43,6 +43,21 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # --- 启动事件 ---
 @app.on_event("startup")
 async def startup_event():
+    # Configure logging
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    # Configure uvicorn logger
+    uvicorn_logger = logging.getLogger("uvicorn.info")
+    uvicorn_logger.addHandler(handler)
+    uvicorn_logger.setLevel(logging.INFO)
+    
+    # Configure app logger
+    app_logger = logging.getLogger("app")
+    app_logger.addHandler(handler)
+    app_logger.setLevel(logging.INFO)
+
     logger = logging.getLogger("uvicorn.info")
     logger.info("--- Baojimi-lite Configuration Check ---")
     if GEMINI_API_KEYS:

@@ -2,6 +2,10 @@ import google.generativeai as genai
 
 MAX_RETRIES = 2
 
+import logging
+
+logger = logging.getLogger("app")
+
 async def self_healing_stream_generator(model_name, gemini_params, api_key):
     """
     A generator that attempts to stream a response from the Gemini API, with self-healing capabilities.
@@ -14,6 +18,7 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
     # Initial contents from the user
     initial_contents = gemini_params.get("contents", [])
 
+    logger.info(f"Initiating self-healing stream for model: {model_name}")
     while retries <= MAX_RETRIES:
         try:
             # Configure the API key for each attempt
@@ -44,10 +49,11 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
             
             # If we received chunks, the stream is considered successful for this attempt
             if chunk_count > 0:
+                logger.info("Stream completed successfully.")
                 return
 
         except Exception as e:
-            print(f"Stream interrupted on attempt {retries + 1}. Error: {e}. Retrying...")
+            logger.warning(f"Stream interrupted on attempt {retries + 1}. Error: {e}. Retrying...")
             # Add the successfully received part of the response to history before retrying
             if full_response_text:
                 chat_history.append({"role": "model", "parts": [full_response_text]})
@@ -58,6 +64,7 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
 
             retries += 1
             if retries > MAX_RETRIES:
+                logger.error("All retries failed.")
                 # After all retries, raise the last exception to be handled by the main endpoint
                 raise e
 
