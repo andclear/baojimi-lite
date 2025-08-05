@@ -9,6 +9,7 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
     """
     chat_history = []
     retries = 0
+    full_response_text = ""
 
     # Initial contents from the user
     initial_contents = gemini_params.get("contents", [])
@@ -20,7 +21,7 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
             model = genai.GenerativeModel(model_name)
 
             # Combine history with the initial request for retries
-            current_contents = chat_history + initial_contents
+            current_contents = initial_contents + chat_history
             
             # Create a new set of params for the attempt
             attempt_params = gemini_params.copy()
@@ -34,15 +35,31 @@ async def self_healing_stream_generator(model_name, gemini_params, api_key):
             )
 
             # Stream and collect history
+            chunk_count = 0
             async for chunk in response:
                 yield chunk
-                if chunk.parts:
-                    # This logic assumes the 'content' structure is suitable for history.
-                    # It might need adjustment based on the actual API response structure.
-                    chat_history.append({"role": "model", "parts": [part.to_dict() for part in chunk.parts]})
+                if chunk.text:
+                    full_response_text += chunk.text
+                chunk_count += 1
+            
+            # If we received chunks, the stream is considered successful for this attempt
+            if chunk_count > 0:
+                return
 
-            # If the stream completes without error, break the loop
-            return
+        except Exception as e:
+            print(f"Stream interrupted on attempt {retries + 1}. Error: {e}. Retrying...")
+            # Add the successfully received part of the response to history before retrying
+            if full_response_text:
+                chat_history.append({"role": "model", "parts": [full_response_text]})
+                full_response_text = "" # Reset for the next retry
+
+            # After the first attempt, subsequent retries should not include the initial user prompt again
+            initial_contents = []
+
+            retries += 1
+            if retries > MAX_RETRIES:
+                # After all retries, raise the last exception to be handled by the main endpoint
+                raise e
 
         except Exception as e:
             print(f"Stream interrupted on attempt {retries + 1}. Error: {e}. Retrying...")

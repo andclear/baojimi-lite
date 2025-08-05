@@ -225,18 +225,20 @@ async def stream_generator(gemini_response, model_name):
         async for chunk in gemini_response:
             if not chunk.parts:
                 continue
+            choice = {
+                "index": 0,
+                "delta": {"content": chunk.text},
+                "finish_reason": None
+            }
+            if chunk.candidates and chunk.candidates[0].finish_reason:
+                choice["finish_reason"] = gemini_finish_reason_to_openai(chunk.candidates[0].finish_reason)
+
             openai_chunk = {
                 "id": f"chatcmpl-{uuid.uuid4()}",
                 "object": "chat.completion.chunk",
                 "created": int(time.time()),
                 "model": model_name,
-                "choices": [
-                    {
-                        "index": 0,
-                        "delta": {"content": chunk.text},
-                        "finish_reason": gemini_finish_reason_to_openai(chunk.candidates[0].finish_reason) if chunk.candidates else None
-                    }
-                ]
+                "choices": [choice]
             }
             yield f"data: {json.dumps(openai_chunk)}\n\n"
     except Exception as e:

@@ -83,9 +83,9 @@ def openai_to_gemini_params(openai_request: dict) -> dict:
             if i == last_user_message_index:
                 random_prefix = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
                 content = f"{random_prefix}\n{content}"
-            gemini_messages.append({"role": "user", "parts": [{"text": content}]})
+            gemini_messages.append({"role": "user", "parts": [content]})
         elif role == "assistant":
-            gemini_messages.append({"role": "model", "parts": [{"text": content}]})
+            gemini_messages.append({"role": "model", "parts": [content]})
 
     gemini_params["system_instruction"] = system_instruction
     gemini_params["contents"] = gemini_messages
