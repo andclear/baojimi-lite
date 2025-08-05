@@ -48,17 +48,12 @@ async def startup_event():
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     
-    # Configure uvicorn logger
-    uvicorn_logger = logging.getLogger("uvicorn.info")
-    uvicorn_logger.addHandler(handler)
-    uvicorn_logger.setLevel(logging.INFO)
-    
     # Configure app logger
     app_logger = logging.getLogger("app")
     app_logger.addHandler(handler)
     app_logger.setLevel(logging.INFO)
 
-    logger = logging.getLogger("uvicorn.info")
+    logger = logging.getLogger("app")
     logger.info("--- Baojimi-lite Configuration Check ---")
     if GEMINI_API_KEYS:
         logger.info("已配置Gemini API Key")
@@ -205,7 +200,10 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
                 response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"])
                 log_entry["status"] = "success"
                 call_logs.appendleft(log_entry)
-                return non_stream_response(response, model_name)
+                openai_response = non_stream_response(response, model_name)
+                if "error" in openai_response:
+                    raise HTTPException(status_code=500, detail=openai_response["error"])
+                return openai_response
         except Exception as e:
             print(f"Attempt {i+1} with key ...{api_key[-4:]} failed: {e}")
             log_entry["status"] = "failed"
@@ -236,17 +234,23 @@ def gemini_finish_reason_to_openai(reason: str) -> str:
     }.get(reason, "stop")
 
 async def stream_generator(gemini_response, model_name):
+    final_finish_reason = "stop"  # Default finish reason
     try:
         async for chunk in gemini_response:
             if not chunk.parts:
                 continue
+            
+            finish_reason = None
+            if chunk.candidates and chunk.candidates[0].finish_reason:
+                finish_reason = gemini_finish_reason_to_openai(chunk.candidates[0].finish_reason)
+                if finish_reason != 'stop': # Keep track of the final non-stop reason
+                    final_finish_reason = finish_reason
+
             choice = {
                 "index": 0,
                 "delta": {"content": chunk.text},
-                "finish_reason": None
+                "finish_reason": finish_reason
             }
-            if chunk.candidates and chunk.candidates[0].finish_reason:
-                choice["finish_reason"] = gemini_finish_reason_to_openai(chunk.candidates[0].finish_reason)
 
             openai_chunk = {
                 "id": f"chatcmpl-{uuid.uuid4()}",
@@ -256,29 +260,42 @@ async def stream_generator(gemini_response, model_name):
                 "choices": [choice]
             }
             yield f"data: {json.dumps(openai_chunk)}\n\n"
+
     except Exception as e:
         print(f"Error in stream generator: {e}")
         error_chunk = {"error": str(e)}
         yield f"data: {json.dumps(error_chunk)}\n\n"
+        final_finish_reason = "error"
 
-    final_chunk = {
-        "id": f"chatcmpl-{uuid.uuid4()}",
-        "object": "chat.completion.chunk",
-        "created": int(time.time()),
-        "model": model_name,
-        "choices": [
-            {
-                "index": 0,
-                "delta": {},
-                "finish_reason": "stop"
-            }
-        ]
-    }
-    yield f"data: {json.dumps(final_chunk)}\n\n"
-    yield "data: [DONE]\n\n"
+    finally:
+        # This final chunk is sent regardless of whether the stream finished successfully or not.
+        final_chunk = {
+            "id": f"chatcmpl-{uuid.uuid4()}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model_name,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": final_finish_reason
+                }
+            ]
+        }
+        yield f"data: {json.dumps(final_chunk)}\n\n"
+        yield "data: [DONE]\n\n"
 
 def non_stream_response(gemini_response, model_name):
     try:
+        # Check for content blocking or other issues
+        if not gemini_response.candidates or not gemini_response.candidates[0].content.parts:
+            prompt_feedback = getattr(gemini_response, 'prompt_feedback', None)
+            finish_reason = prompt_feedback.block_reason if prompt_feedback else "unknown"
+            error_message = f"Response was blocked. Reason: {finish_reason}"
+            if prompt_feedback and prompt_feedback.block_reason == 'SAFETY':
+                 error_message += f", Safety Ratings: {prompt_feedback.safety_ratings}"
+            return {"error": {"message": error_message, "type": "invalid_request_error", "code": "content_filter"}}
+
         content = gemini_response.text
         usage = gemini_response.usage_metadata
         finish_reason = gemini_finish_reason_to_openai(gemini_response.candidates[0].finish_reason if gemini_response.candidates else None)
@@ -302,17 +319,8 @@ def non_stream_response(gemini_response, model_name):
             }
         }
     except Exception as e:
-        # Handle cases where the response might not have the expected structure
-        # For example, if the response was blocked due to safety settings
-        try:
-            # Try to get a more descriptive error from the response
-            error_details = str(gemini_response.prompt_feedback)
-        except AttributeError:
-            error_details = str(e)
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to process Gemini response", "details": error_details}
-        )
+        # General exception handler
+        return {"error": {"message": f"Failed to process Gemini response: {e}", "type": "api_error", "code": "internal_error"}}
 
 
 

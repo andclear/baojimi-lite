@@ -2,6 +2,7 @@ from typing import List, Dict
 import random
 import string
 
+
 # Gemini 1.0 安全设置
 SAFETY_SETTINGS = [
     {
@@ -62,6 +63,14 @@ def openai_to_gemini_params(openai_request: dict) -> dict:
     gemini_params["generation_config"] = {k: v for k, v in generation_config.items() if v is not None}
 
     messages = openai_request.get("messages", [])
+
+    # Add a random prefix to the last user message to prevent cache hits
+    if messages and messages[-1]["role"] == "user":
+        last_content = messages[-1].get("content", "")
+        if isinstance(last_content, str):
+            random_prefix = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+            messages[-1]["content"] = f"{random_prefix}\n{last_content}"
+
     system_instruction = None
     gemini_messages = []
 
@@ -70,22 +79,25 @@ def openai_to_gemini_params(openai_request: dict) -> dict:
             system_instruction = msg["content"]
             break
 
-    last_user_message_index = -1
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]["role"] == "user":
-            last_user_message_index = i
-            break
-
-    for i, msg in enumerate(messages):
+    for msg in messages:
         role = msg["role"]
         content = msg["content"]
-        if role == "user":
-            if i == last_user_message_index:
-                random_prefix = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-                content = f"{random_prefix}\n{content}"
-            gemini_messages.append({"role": "user", "parts": [content]})
-        elif role == "assistant":
-            gemini_messages.append({"role": "model", "parts": [content]})
+        # Skip system messages as they are handled separately
+        if role == "system":
+            continue
+        
+        # Gemini API expects 'model' for assistant role
+        gemini_role = "model" if role == "assistant" else role
+        
+        # Per Gemini API documentation, parts should be a list of dicts with a 'text' key
+        if isinstance(content, str):
+            gemini_messages.append({"role": gemini_role, "parts": [{"text": content}]})
+        elif isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict) and "text" in item:
+                    parts.append({"text": item["text"]})
+            gemini_messages.append({"role": gemini_role, "parts": parts})
 
     gemini_params["system_instruction"] = system_instruction
     gemini_params["contents"] = gemini_messages
