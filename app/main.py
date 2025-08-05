@@ -187,7 +187,7 @@ async def chat_completions(req: ChatCompletionRequest, request: Request, auth: s
                 call_logs.appendleft(log_entry)
                 return StreamingResponse(stream_generator(response_generator, model_name), media_type="text/event-stream")
             else:
-                response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"], system_instruction=gemini_params.get("system_instruction"))
+                response = await model.generate_content_async(gemini_params["contents"], generation_config=gemini_params["generation_config"])
                 log_entry["status"] = "success"
                 call_logs.appendleft(log_entry)
                 return non_stream_response(response, model_name)
